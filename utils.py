@@ -12,7 +12,7 @@ from data import ImageDataset, ImageDataset_2D, ImageDataset_3D
 
 def get_config(config):
     with open(config, 'r') as stream:
-        return yaml.load(stream)
+        return yaml.safe_load(stream)
 
 def prepare_sub_folder(output_directory):
     image_directory = os.path.join(output_directory, 'images')
@@ -31,7 +31,7 @@ def get_data_loader(data, img_path, img_dim, img_slice,
                     train, batch_size, 
                     num_workers=4, 
                     return_data_idx=False):
-    
+
     if data == 'phantom':
         dataset = ImageDataset(img_path, img_dim)
     elif '3d' in data:
@@ -86,33 +86,36 @@ def map_coordinates(input, coordinates):
 
     fx1 = f00 + d1 * (f10 - f00)
     fx2 = f01 + d1 * (f11 - f01)
-    
+
     return fx1 + d2 * (fx2 - fx1)
 
 
 def ct_parallel_project_2d(img, theta):
-	bs, h, w, c = img.size()
+    bs, h, w, c = img.size()
+    # (y, x)=(i, j): [0, w] -> [-0.5, 0.5]
+    y, x = torch.meshgrid([torch.arange(h, dtype=torch.float32) / h - 0.5,
+                           torch.arange(w, dtype=torch.float32) / w - 0.5])
 
-	# (y, x)=(i, j): [0, w] -> [-0.5, 0.5]
-	y, x = torch.meshgrid([torch.arange(h, dtype=torch.float32) / h - 0.5,
-							torch.arange(w, dtype=torch.float32) / w - 0.5])
+    # Rotation transform matrix: simulate parallel projection rays
+    theta = theta.to(img.device)
+    y = y.to(img.device)
+    x = x.to(img.device)
+    #breakpoint()
+    x_rot = x * torch.cos(theta) - y * torch.sin(theta)
+    y_rot = x * torch.sin(theta) + y * torch.cos(theta)
 
-	# Rotation transform matrix: simulate parallel projection rays
-	x_rot = x * torch.cos(theta) - y * torch.sin(theta)
-	y_rot = x * torch.sin(theta) + y * torch.cos(theta)
+    # Reverse back to index [0, w]
+    x_rot = (x_rot + 0.5) * w
+    y_rot = (y_rot + 0.5) * h
 
-	# Reverse back to index [0, w]
-	x_rot = (x_rot + 0.5) * w
-	y_rot = (y_rot + 0.5) * h
+    # Resample (x, y) index of the pixel on the projection ray-theta
+    sample_coords = torch.stack([y_rot, x_rot], dim=0).cuda()  # [2, h, w]
+    img_resampled = map_coordinates(img, sample_coords) # [b, h, w, c]
 
-	# Resample (x, y) index of the pixel on the projection ray-theta
-	sample_coords = torch.stack([y_rot, x_rot], dim=0).cuda()  # [2, h, w]
-	img_resampled = map_coordinates(img, sample_coords) # [b, h, w, c]
+    # Compute integral projections along rays
+    proj = torch.mean(img_resampled, dim=1, keepdim=True) # [b, 1, w, c]
 
-	# Compute integral projections along rays
-	proj = torch.mean(img_resampled, dim=1, keepdim=True) # [b, 1, w, c]
-
-	return proj
+    return proj
 
 
 def ct_parallel_project_2d_batch(img, thetas):
@@ -122,8 +125,8 @@ def ct_parallel_project_2d_batch(img, thetas):
     '''
     projs = []
     for theta in thetas:
-    	proj = ct_parallel_project_2d(img, theta)
-    	projs.append(proj)
+        proj = ct_parallel_project_2d(img, theta)
+        projs.append(proj)
     projs = torch.cat(projs, dim=1)  # [b, num, w, c]
 
     return projs

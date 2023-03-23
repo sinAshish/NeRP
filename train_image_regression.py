@@ -22,6 +22,7 @@ parser.add_argument('--output_path', type=str, default='.', help="outputs path")
 
 # Load experiment setting
 opts = parser.parse_args()
+#$breakpoint()
 config = get_config(opts.config)
 max_iter = config['max_iter']
 
