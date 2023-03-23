@@ -17,15 +17,15 @@ lr: 0.00001                    # Initial learning rate [RFF: 10-3, Neural Recon:
 # Model options
 model: SIREN                  # Options for MLP models
 net: 
-  network_input_size: 512     # Input size for network
+  network_input_size: 128 #512     # Input size for network
   network_output_size: 1
-  network_depth: 8            # Depth of MLP layers
-  network_width: 256          # Width of MLP layers
+  network_depth: 4 #8           # Depth of MLP layers
+  network_width: 64 #256          # Width of MLP layers
 
 encoder:
   embedding: gauss            # Input embedding method
-  scale: 4
-  embedding_size: 256         # Embedding size for input Fourier feature encoding
+  scale: 2
+  embedding_size: 64 #256         # Embedding size for input Fourier feature encoding
   coordinates_size: 3
 
 num_proj: 20                  # Number of projections for CT recon
@@ -34,7 +34,8 @@ proj_size: [512, 800]
 
 # Raw patients data
 data: pancs_4dct_3d_real_phase6
-img_size: [40, 128, 128]  # full size: (92, 256, 256)
+  #img_size: [40, 128, 128]  # full size: (92, 256, 256)
+img_size: [2, 64, 64]
 img_path: ./data/ct_data/pancs_4dct_phase6.npz  # Image path for data loading
 pretrain_model_path: ./outputs/image_regression_3d/pancs_4dct_3d_real_phase1/img{}_{}_{}_{}_{}_L2_lr0.0001_encoder_gauss_scale{}_size{}/checkpoints/model_002000.pt
 
